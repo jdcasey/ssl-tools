@@ -20,7 +20,7 @@ import org.commonjava.ssl.SSLToolsException;
 import org.commonjava.ssl.sec.Digester;
 import org.commonjava.ssl.sec.KeyStoreManager;
 import org.commonjava.ssl.sec.Digester.Digest;
-import org.commonjava.util.logging.Logger;
+import org.commonjava.ssl.util.Logger;
 
 import javax.net.ssl.SSLContext;
 import javax.net.ssl.SSLException;
