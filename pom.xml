@@ -261,4 +261,11 @@
       </build>
     </profile>
   </profiles>
+  
+  <distributionManagement>
+    <site>
+      <id>local-website</id>
+      <url>file://${project.build.directory}/site-deploy</url>
+    </site>
+  </distributionManagement>
 </project>
