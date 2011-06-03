@@ -45,31 +45,43 @@ import java.util.Map;
 
 public class CertificateImporter
 {
-    
+
     private static final Logger LOGGER = new Logger( CertificateImporter.class );
+
+    private final KeyStore keystore;
     
-    public void importClientCertificate( File clientCertFile, char[] certpass, File keystoreFile, char[] storepass )
+    private boolean changed = false;
+
+    private CertificateImporter( KeyStore keystore )
+    {
+        this.keystore = keystore;
+    }
+
+    public CertificateImporter importClientCertificate( File clientCertFile, char[] certpass )
         throws SSLToolsException
     {
-        KeyStoreManager target = new KeyStoreManager( keystoreFile, storepass );
-        KeyStore targetKeystore = target.getKeystore();
-        
-        KeyStoreManager pkcs = new KeyStoreManager( clientCertFile, KeyStoreManager.PKCS12_KEYSTORE_TYPE, certpass );
-        KeyStore pkcs12Keystore = pkcs.getKeystore();
+        if ( clientCertFile == null || !( clientCertFile.isFile() && clientCertFile.canRead() ) )
+        {
+            LOGGER.info( "Invalid client certificate file: %s. Cannot import.", clientCertFile );
+            return this;
+        }
+
+        KeyStore pkcs12Keystore = KeyStoreManager.load( clientCertFile, certpass, KeyStoreManager.PKCS12_KEYSTORE_TYPE );
 
         try
         {
             for ( Enumeration<String> e = pkcs12Keystore.aliases(); e.hasMoreElements(); )
             {
                 String alias = e.nextElement();
-                
+
                 if ( pkcs12Keystore.isKeyEntry( alias ) )
                 {
                     LOGGER.info( "Adding key for: %s", alias );
                     Key key = pkcs12Keystore.getKey( alias, certpass );
 
                     Certificate[] chain = pkcs12Keystore.getCertificateChain( alias );
-                    targetKeystore.setKeyEntry( alias, key, storepass, chain );
+                    keystore.setKeyEntry( alias, key, certpass, chain );
+                    changed = true;
                 }
             }
         }
@@ -86,16 +98,13 @@ public class CertificateImporter
             throw new SSLToolsException( "Failed to add new keys to keystore: %s", e, e.getMessage() );
         }
         
-        target.save();
+        return this;
     }
-    
-    public void importServerCertificates( String host, int port, File sourceKeystore, char[] storepass,
-                                          File targetKeystore )
+
+    public CertificateImporter importServerCertificates( String host, int port, File sourceKeystore, char[] sourceStorepass,
+                                          File targetKeystore, char[] targetStorepass )
         throws SSLToolsException
     {
-        KeyStoreManager ksm = new KeyStoreManager( sourceKeystore, storepass );
-        KeyStore ks = ksm.getKeystore();
-
         SSLSocket socket;
         SSLContext context;
         SavingTrustManager tm;
@@ -107,7 +116,7 @@ public class CertificateImporter
             context = SSLContext.getInstance( "TLS" );
 
             TrustManagerFactory tmf = TrustManagerFactory.getInstance( TrustManagerFactory.getDefaultAlgorithm() );
-            tmf.init( ks );
+            tmf.init( keystore );
 
             X509TrustManager defaultTrustManager = (X509TrustManager) tmf.getTrustManagers()[0];
             tm = new SavingTrustManager( defaultTrustManager );
@@ -137,7 +146,7 @@ public class CertificateImporter
             socket.close();
 
             LOGGER.debug( "All certificates are already trusted. Nothing to do." );
-            return;
+            return this;
         }
         catch ( SSLException e )
         {
@@ -156,9 +165,9 @@ public class CertificateImporter
         if ( chain == null )
         {
             LOGGER.error( "Could not obtain server certificate chain.\nException from SSL handshake was: %s",
-                                                                              sslException, sslException.getMessage() );
+                          sslException, sslException.getMessage() );
             sslException.printStackTrace( System.out );
-            return;
+            return this;
         }
 
         Digester digester = new Digester();
@@ -170,7 +179,7 @@ public class CertificateImporter
 
         try
         {
-            for ( Enumeration<String> e = ks.aliases(); e.hasMoreElements(); )
+            for ( Enumeration<String> e = keystore.aliases(); e.hasMoreElements(); )
             {
                 String alias = (String) e.nextElement();
                 if ( alias.startsWith( hostPrefix ) )
@@ -179,9 +188,9 @@ public class CertificateImporter
                     hostPrefixIdx++;
                 }
 
-                if ( alias != null && ks.isCertificateEntry( alias ) )
+                if ( alias != null && keystore.isCertificateEntry( alias ) )
                 {
-                    Certificate cert = ks.getCertificate( alias );
+                    Certificate cert = keystore.getCertificate( alias );
 
                     Digest digest = digester.newDigest( cert.getEncoded() );
                     existingCertificates.put( digest, alias );
@@ -220,7 +229,8 @@ public class CertificateImporter
             String name = existingCertificates.get( digest );
             if ( name != null )
             {
-                LOGGER.debug( "Keystore already contains certificate with this SHA1 hash, under alias: '%s' ...Skipping.", name );
+                LOGGER.debug( "Keystore already contains certificate with this SHA1 hash, under alias: '%s' ...Skipping.",
+                              name );
                 continue;
             }
 
@@ -233,7 +243,8 @@ public class CertificateImporter
             try
             {
                 existingCertificates.put( digest, alias );
-                ks.setCertificateEntry( alias, cert );
+                keystore.setCertificateEntry( alias, cert );
+                changed = true;
             }
             catch ( KeyStoreException e )
             {
@@ -245,10 +256,58 @@ public class CertificateImporter
 
             LOGGER.info( "Added certificate to keystore using alias: '%s'", alias );
         }
-        
-        ksm.setKeystoreFile( targetKeystore );
-        ksm.save();
 
+        return this;
+    }
+    
+    public boolean isChanged()
+    {
+        return changed;
+    }
+
+    public static CertificateImporter open( File keystoreFile, char[] storepass )
+        throws SSLToolsException
+    {
+        if ( keystoreFile == null )
+        {
+            throw new SSLToolsException( "Invalid keystore file: %s. Cannot import.", keystoreFile );
+        }
+
+        KeyStore ks = KeyStoreManager.load( keystoreFile, storepass );
+        return new CertificateImporter( ks );
+    }
+
+    public static CertificateImporter openOrCreate( File keystoreFile, char[] storepass )
+        throws SSLToolsException
+    {
+        if ( keystoreFile == null )
+        {
+            throw new SSLToolsException( "Invalid keystore file: %s. Cannot import.", keystoreFile );
+        }
+
+        KeyStore ks;
+        if ( !keystoreFile.exists() )
+        {
+            ks = KeyStoreManager.create();
+        }
+        else
+        {
+            ks = KeyStoreManager.load( keystoreFile, storepass );
+        }
+        
+        return new CertificateImporter( ks );
+    }
+
+    public void save( File keystoreFile, char[] storepass )
+        throws SSLToolsException
+    {
+        KeyStoreManager.save( keystore, keystoreFile, storepass );
+    }
+
+    public void save( File keystoreFile, char[] storepass, boolean makeBackup )
+        throws SSLToolsException
+    {
+        KeyStoreManager.save( keystore, keystoreFile, storepass, makeBackup );
     }
 
 }

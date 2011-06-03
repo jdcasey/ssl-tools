@@ -27,6 +27,9 @@ import org.commonjava.ssl.in.CertificateImporter;
 import java.io.File;
 
 /**
+ * Imports a client certificate file (in <a href="http://www.rsa.com/rsalabs/node.asp?id=2138">PKCS#12</a>
+ * format) into a Java keystore file.
+ * 
  * @goal import-client-cert
  */
 public class ImportPkcs12
@@ -35,12 +38,34 @@ public class ImportPkcs12
 
     private Log log;
     
+    /**
+     * Keystore file into which the client certificate should be imported.
+     * 
+     * @parameter expression="${import.keystore}" default-value="${java.home}/lib/security/cacerts"
+     */
     private File keystore;
     
+    /**
+     * File containing the client certificate in <a href="http://www.rsa.com/rsalabs/node.asp?id=2138">PKCS#12</a>
+     * format.
+     * 
+     * @parameter expression="${import.certificat}"
+     * @required
+     */
     private File certificate;
     
+    /**
+     * Password for the Keystore file.
+     * 
+     * @parameter expression="${import.storepass}" default="changeit"
+     */
     private String storepass;
     
+    /**
+     * Password for the client certificate file.
+     * 
+     * @parameter expression="${import.certpass}"
+     */
     private String certpass;
 
     @Override
@@ -49,7 +74,14 @@ public class ImportPkcs12
     {
         try
         {
-            new CertificateImporter().importClientCertificate( certificate, certpass.toCharArray(), keystore, storepass.toCharArray() );
+            CertificateImporter importer =
+                CertificateImporter.open( keystore, storepass.toCharArray() ).importClientCertificate( certificate,
+                                                                                                       certpass.toCharArray() );
+            
+            if ( importer.isChanged() )
+            {
+                importer.save( keystore, storepass.toCharArray() );
+            }
         }
         catch ( SSLToolsException e )
         {

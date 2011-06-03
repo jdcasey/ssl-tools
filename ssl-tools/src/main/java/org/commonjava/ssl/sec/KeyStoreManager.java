@@ -26,50 +26,24 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.security.KeyStore;
+import java.security.KeyStoreException;
 
 public class KeyStoreManager
 {
-    
+
     public static final String DEFAULT_KEYSTORE_TYPE = KeyStore.getDefaultType();
-    
+
     public static final String PKCS12_KEYSTORE_TYPE = "pkcs12";
 
     private static final String FS = File.separator;
-
-    private char[] storepass;
-
-    private File keystoreFile;
-
-    private KeyStore keystore;
-
-    private String keystoreType;
-
-    public KeyStoreManager( final File keystoreFile, final char[] storepass )
-        throws SSLToolsException
-    {
-        this.keystoreFile = keystoreFile;
-        this.storepass = storepass == null ? null : defensiveCopy( storepass );
-        this.keystoreType = KeyStore.getDefaultType();
-
-        load();
-    }
-
-    public KeyStoreManager( final File keystoreFile, final String keystoreType, final char[] storepass )
-        throws SSLToolsException
-    {
-        this.keystoreFile = keystoreFile;
-        this.keystoreType = keystoreType;
-        this.storepass = storepass == null ? null : defensiveCopy( storepass );
-        this.keystoreType = KeyStore.getDefaultType();
-
-        load();
-    }
     
+    private KeyStoreManager(){}
+
     public static char[] getDefaultKeystorePassword()
     {
         return "changeit".toCharArray();
     }
-    
+
     public static File getDefaultSourceKeystore()
     {
         File dir = new File( System.getProperty( "java.home" ) + FS + "lib" + FS + "security" );
@@ -80,7 +54,7 @@ public class KeyStoreManager
         {
             sourceKeystore = new File( dir, "cacerts" );
         }
-        
+
         return sourceKeystore;
     }
 
@@ -88,17 +62,17 @@ public class KeyStoreManager
     {
         File dir = new File( System.getProperty( "java.home" ) + FS + "lib" + FS + "security" );
         File targetKeystore = new File( dir, "jssecacerts" );
-        
+
         return targetKeystore;
     }
-    
-    public void save()
+
+    public static void save( KeyStore keystore, File keystoreFile, char[] storepass )
         throws SSLToolsException
     {
-        save( false );
+        save( keystore, keystoreFile, storepass, false );
     }
 
-    public void save( boolean makeBackup )
+    public static void save( KeyStore keystore, File keystoreFile, char[] storepass, boolean makeBackup )
         throws SSLToolsException
     {
         OutputStream out = null;
@@ -109,7 +83,7 @@ public class KeyStoreManager
                 File renamed = new File( keystoreFile.getAbsolutePath() + ".bak" );
                 keystoreFile.renameTo( renamed );
             }
-            
+
             out = new FileOutputStream( keystoreFile );
             keystore.store( out, storepass );
         }
@@ -123,7 +97,13 @@ public class KeyStoreManager
         }
     }
 
-    private void load()
+    public static KeyStore load( File keystoreFile, char[] storepass )
+        throws SSLToolsException
+    {
+        return load( keystoreFile, storepass, DEFAULT_KEYSTORE_TYPE );
+    }
+
+    public static KeyStore load( File keystoreFile, char[] storepass, String keystoreType )
         throws SSLToolsException
     {
         InputStream in = null;
@@ -131,8 +111,10 @@ public class KeyStoreManager
         {
             in = new FileInputStream( keystoreFile );
 
-            keystore = KeyStore.getInstance( keystoreType );
+            KeyStore keystore = KeyStore.getInstance( keystoreType );
             keystore.load( in, storepass );
+
+            return keystore;
         }
         catch ( Exception e )
         {
@@ -144,54 +126,23 @@ public class KeyStoreManager
         }
     }
 
-    public KeyStore getKeystore()
+    public static KeyStore create()
+        throws SSLToolsException
     {
-        return keystore;
+        return create( DEFAULT_KEYSTORE_TYPE );
     }
 
-    public char[] getStorepass()
+    public static KeyStore create( String keystoreType )
+        throws SSLToolsException
     {
-        return defensiveCopy( storepass );
-    }
-
-    public void setStorepass( char[] storepass )
-    {
-        if ( storepass == null )
+        try
         {
-            this.storepass = null;
+            return KeyStore.getInstance( keystoreType );
         }
-        else
+        catch ( KeyStoreException e )
         {
-            this.storepass = defensiveCopy( storepass );
+            throw new SSLToolsException( "Failed to create KeyStore instance: %s", e, e.getMessage() );
         }
-    }
-
-    public void setKeystoreFile( File sourceKeystore )
-    {
-        this.keystoreFile = sourceKeystore;
-    }
-
-    private char[] defensiveCopy( char[] pass )
-    {
-        char[] defensiveCopy = new char[pass.length];
-        System.arraycopy( pass, 0, defensiveCopy, 0, pass.length );
-
-        return defensiveCopy;
-    }
-
-    public String getKeystoreType()
-    {
-        return keystoreType;
-    }
-
-    public void setKeystoreType( String keystoreType )
-    {
-        this.keystoreType = keystoreType;
-    }
-
-    public File getKeystoreFile()
-    {
-        return keystoreFile;
     }
 
 }
