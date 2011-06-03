@@ -22,7 +22,7 @@ import org.apache.maven.plugin.logging.Log;
 
 import java.io.File;
 
-abstract class AbstractKeystoreMojo
+abstract class AbstractSSLToolsMojo
     implements Mojo
 {
 
@@ -38,17 +38,47 @@ abstract class AbstractKeystoreMojo
     /**
      * Password for the Keystore file.
      * 
-     * @parameter expression="${import.storepass}" default="changeit"
+     * @parameter expression="${import.storepass}" default-value="changeit"
      */
     protected String storepass;
-    
+
     /**
-     * If <code>true</code>, throw an exception to stop the build if there are import failures.
-     * (Otherwise, simply report the failures and continue.)
+     * If <code>true</code>, throw an exception to stop the build if there are import failures. (Otherwise, simply
+     * report the failures and continue.)
      * 
-     * @parameter expression="${import.stop-on-failure}" default="false"
+     * @parameter expression="${import.stop-on-failure}" default-value="false"
      */
     protected boolean stopOnFailure;
+
+    public File getKeystore()
+    {
+        return keystore;
+    }
+
+    public void setKeystore( File keystore )
+    {
+        this.keystore = keystore;
+    }
+
+    public String getStorepass()
+    {
+        return storepass;
+    }
+
+    public void setStorepass( String storepass )
+    {
+        this.storepass = storepass;
+    }
+
+    public boolean isStopOnFailure()
+    {
+        return stopOnFailure;
+    }
+
+    public void setStopOnFailure( boolean stopOnFailure )
+    {
+        this.stopOnFailure = stopOnFailure;
+    }
 
     @Override
     public Log getLog()

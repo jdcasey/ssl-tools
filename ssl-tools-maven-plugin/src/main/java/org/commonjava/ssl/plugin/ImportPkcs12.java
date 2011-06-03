@@ -17,10 +17,8 @@
 
 package org.commonjava.ssl.plugin;
 
-import org.apache.maven.plugin.Mojo;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
-import org.apache.maven.plugin.logging.Log;
 import org.commonjava.ssl.SSLToolsException;
 import org.commonjava.ssl.in.CertificateImporter;
 
@@ -33,17 +31,8 @@ import java.io.File;
  * @goal import-client-cert
  */
 public class ImportPkcs12
-    implements Mojo
+    extends AbstractSSLToolsMojo
 {
-
-    private Log log;
-
-    /**
-     * Keystore file into which the client certificate should be imported.
-     * 
-     * @parameter expression="${import.keystore}" default-value="${java.home}/lib/security/cacerts"
-     */
-    private File keystore;
 
     /**
      * File containing the client certificate in <a href="http://www.rsa.com/rsalabs/node.asp?id=2138">PKCS#12</a>
@@ -53,13 +42,6 @@ public class ImportPkcs12
      * @required
      */
     private File certificate;
-
-    /**
-     * Password for the Keystore file.
-     * 
-     * @parameter expression="${import.storepass}" default="changeit"
-     */
-    private String storepass;
 
     /**
      * Password for the client certificate file.
@@ -89,16 +71,24 @@ public class ImportPkcs12
         }
     }
 
-    @Override
-    public Log getLog()
+    public File getCertificate()
     {
-        return log;
+        return certificate;
     }
 
-    @Override
-    public void setLog( Log log )
+    public void setCertificate( File certificate )
     {
-        this.log = log;
+        this.certificate = certificate;
+    }
+
+    public String getCertpass()
+    {
+        return certpass;
+    }
+
+    public void setCertpass( String certpass )
+    {
+        this.certpass = certpass;
     }
 
 }

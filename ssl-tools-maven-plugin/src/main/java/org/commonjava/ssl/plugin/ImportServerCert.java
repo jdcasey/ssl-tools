@@ -35,9 +35,11 @@ import java.io.File;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Imports one or more server SSL certificates (usually self-signed, or this wouldn't be necessary) into a Java keystore
@@ -48,7 +50,7 @@ import java.util.Map;
  * @goal import-server-cert
  */
 public class ImportServerCert
-    extends AbstractKeystoreMojo
+    extends AbstractSSLToolsMojo
 {
 
     /**
@@ -101,6 +103,10 @@ public class ImportServerCert
         if ( sourceKeystore == null )
         {
             sourceKeystore = keystore;
+        }
+        
+        if ( sourceStorepass == null )
+        {
             sourceStorepass = storepass;
         }
         
@@ -114,21 +120,22 @@ public class ImportServerCert
         }
         
         Map<String, SSLToolsException> errors = new LinkedHashMap<String, SSLToolsException>();
+        Set<String> seen = new HashSet<String>();
         
         if ( importServers != null )
         {
             String[] servers = importServers.split( "\\s*,\\s*" );
-            importAll( Arrays.asList( servers ), errors );
+            importAll( Arrays.asList( servers ), seen, errors );
         }
         
         if ( servers != null )
         {
-            importAll( servers, errors );
+            importAll( servers, seen, errors );
         }
         
         if (importServers == null && servers == null )
         {
-            importProjectCerts( errors );
+            importProjectCerts( seen, errors );
         }
 
         if ( importer != null && importer.isChanged() )
@@ -156,16 +163,16 @@ public class ImportServerCert
         }
     }
 
-    private void importProjectCerts( Map<String, SSLToolsException> errors )
+    private void importProjectCerts( Set<String> seen, Map<String, SSLToolsException> errors )
     {
         RepositorySystemSession rss = session.getRepositorySession();
         MirrorSelector mirrorSelector = rss.getMirrorSelector();
         
         List<Repository> repos = project.getRepositories();
-        importRepos( repos, mirrorSelector, errors );
+        importRepos( repos, mirrorSelector, seen, errors );
         
         repos = project.getPluginRepositories();
-        importRepos( repos, mirrorSelector, errors );
+        importRepos( repos, mirrorSelector, seen, errors );
         
         DistributionManagement dm = project.getDistributionManagement();
         if ( dm != null )
@@ -179,20 +186,20 @@ public class ImportServerCert
             {
                 if ( drepo != null )
                 {
-                    importCerts( drepo.getUrl(), errors );
+                    importCerts( drepo.getUrl(), seen, errors );
                 }
             }
             
             Site site = dm.getSite();
             if ( site != null )
             {
-                importCerts( site.getUrl(), errors );
+                importCerts( site.getUrl(), seen, errors );
             }
         }
     }
 
     private void importRepos( List<Repository> repos, MirrorSelector mirrorSelector,
-                              Map<String, SSLToolsException> errors )
+                              Set<String> seen, Map<String, SSLToolsException> errors )
     {
         if ( repos != null )
         {
@@ -208,13 +215,30 @@ public class ImportServerCert
                     }
                 }
                 
-                importCerts( url, errors );
+                importCerts( url, seen, errors );
             }
         }
     }
 
-    private void importCerts( String serverUrl, Map<String, SSLToolsException> errors )
+    private void importCerts( String serverUrl, Set<String> seen, Map<String, SSLToolsException> errors )
     {
+        if ( seen.contains( serverUrl ) )
+        {
+            return;
+        }
+        
+        seen.add( serverUrl );
+        
+        if ( !serverUrl.startsWith( "https" ) )
+        {
+            getLog().info( "Skipping: '" + serverUrl + "'" );
+            return;
+        }
+        else
+        {
+            getLog().info( "Importing: '" + serverUrl + "'" );
+        }
+        
         try
         {
             URL url = new URL( serverUrl );
@@ -238,10 +262,17 @@ public class ImportServerCert
         }
     }
 
-    private void importAll( Iterable<String> servers, Map<String, SSLToolsException> errors )
+    private void importAll( Iterable<String> servers, Set<String> seen, Map<String, SSLToolsException> errors )
     {
         for ( String server : servers )
         {
+            if ( seen.contains( server ) )
+            {
+                continue;
+            }
+            
+            seen.add( server );
+            
             String host = server;
             int port = -1;
             
@@ -262,6 +293,66 @@ public class ImportServerCert
                 errors.put( server, e );
             }
         }
+    }
+
+    public File getSourceKeystore()
+    {
+        return sourceKeystore;
+    }
+
+    public void setSourceKeystore( File sourceKeystore )
+    {
+        this.sourceKeystore = sourceKeystore;
+    }
+
+    public String getSourceStorepass()
+    {
+        return sourceStorepass;
+    }
+
+    public void setSourceStorepass( String sourceStorepass )
+    {
+        this.sourceStorepass = sourceStorepass;
+    }
+
+    public List<String> getServers()
+    {
+        return servers;
+    }
+
+    public void setServers( List<String> servers )
+    {
+        this.servers = servers;
+    }
+
+    public String getImportServers()
+    {
+        return importServers;
+    }
+
+    public void setImportServers( String importServers )
+    {
+        this.importServers = importServers;
+    }
+
+    public MavenProject getProject()
+    {
+        return project;
+    }
+
+    public void setProject( MavenProject project )
+    {
+        this.project = project;
+    }
+
+    public MavenSession getSession()
+    {
+        return session;
+    }
+
+    public void setSession( MavenSession session )
+    {
+        this.session = session;
     }
 
 }
