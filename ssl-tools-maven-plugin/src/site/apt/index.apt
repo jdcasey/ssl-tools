@@ -1,0 +1,32 @@
+  ---
+  SSL Tools Plugin for Apache Maven: Introduction
+  ---
+  John Casey
+  ---
+  June 3 2011
+  ---
+  
+SSL Tools Plugin for Apache Maven
+
+  The SSL Tools plugin for Apache Maven is primarily used to manage
+  the SSL certificates necessary for accessing repositories and other
+  web locations during a Maven build.
+  
+* Goals Overview
+  
+  Initially, the plugin contains just two goals:
+  
+  * {{{./import-server-cert.html}ssl-tools:import-server-cert}} is used to import
+    SSL certificates into the Java keystore used by Maven. This goal is particularly
+    useful when accessing locations that use self-signed SSL certificates. You have
+    the choice of specifying a list of servers whose certificates you wish to import;
+    or, you can let the goal scan through the repositories and distribution configurations
+    for your project, and add the associated SSL certificates it comes across.
+    
+  * {{{./import-client-cert.html}ssl-tools:import-client-cert}} is used to import
+    client SSL certificates. This is particularly useful for managing connections using
+    mutual SSL authentication.
+    
+* Usage
+
+  Basic instructions for using this plugin can be found on the {{{./usage.html}usage page}}.

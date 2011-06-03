@@ -34,12 +34,16 @@ import javax.net.ssl.X509TrustManager;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.SocketException;
+import java.net.UnknownHostException;
 import java.security.Key;
+import java.security.KeyManagementException;
 import java.security.KeyStore;
 import java.security.KeyStoreException;
 import java.security.NoSuchAlgorithmException;
 import java.security.UnrecoverableKeyException;
 import java.security.cert.Certificate;
+import java.security.cert.CertificateEncodingException;
 import java.security.cert.X509Certificate;
 import java.util.Enumeration;
 import java.util.HashMap;
@@ -51,7 +55,7 @@ public class CertificateImporter
     private static final Logger LOGGER = new Logger( CertificateImporter.class );
 
     private final KeyStore keystore;
-    
+
     private boolean changed = false;
 
     private CertificateImporter( KeyStore keystore )
@@ -99,12 +103,13 @@ public class CertificateImporter
         {
             throw new SSLToolsException( "Failed to add new keys to keystore: %s", e, e.getMessage() );
         }
-        
+
         return this;
     }
 
-    public CertificateImporter importServerCertificates( String host, int port, File sourceKeystore, char[] sourceStorepass,
-                                          File targetKeystore, char[] targetStorepass )
+    public CertificateImporter importServerCertificates( String host, int port, File sourceKeystore,
+                                                         char[] sourceStorepass, File targetKeystore,
+                                                         char[] targetStorepass )
         throws SSLToolsException
     {
         SSLSocket socket;
@@ -132,11 +137,29 @@ public class CertificateImporter
             socket = (SSLSocket) factory.createSocket( host, port );
             socket.setSoTimeout( 10000 );
         }
-        catch ( Exception e )
+        catch ( SocketException e )
         {
-            IllegalStateException error = new IllegalStateException( "Failed to initialize SSL", e );
-
-            throw error;
+            throw new SSLToolsException( "Failed to initialize SSL socket: %s", e, e.getMessage() );
+        }
+        catch ( UnknownHostException e )
+        {
+            throw new SSLToolsException( "Unknown host: %s:%d", e, host, port );
+        }
+        catch ( IOException e )
+        {
+            throw new SSLToolsException( "Failed to initialize SSL socket: %s", e, e.getMessage() );
+        }
+        catch ( KeyManagementException e )
+        {
+            throw new SSLToolsException( "Failed to initialize SSL: %s", e, e.getMessage() );
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            throw new SSLToolsException( "Failed to initialize SSL: %s", e, e.getMessage() );
+        }
+        catch ( KeyStoreException e )
+        {
+            throw new SSLToolsException( "Failed to initialize SSL: %s", e, e.getMessage() );
         }
 
         SSLException sslException = null;
@@ -157,19 +180,14 @@ public class CertificateImporter
         }
         catch ( IOException e )
         {
-            IllegalStateException error = new IllegalStateException( "I/O error performing SSL handshake." );
-            error.initCause( e );
-
-            throw error;
+            throw new SSLToolsException( "I/O error performing SSL handshake for: %s:%d. Error: %s", e, host, port,
+                                         e.getMessage() );
         }
 
         X509Certificate[] chain = tm.getChain();
         if ( chain == null )
         {
-            LOGGER.error( "Could not obtain server certificate chain.\nException from SSL handshake was: %s",
-                          sslException, sslException.getMessage() );
-            sslException.printStackTrace( System.out );
-            return this;
+            throw new SSLToolsException( "Could not retrieve certificate chain: %s", sslException, sslException.getMessage() );
         }
 
         Digester digester = new Digester();
@@ -199,13 +217,15 @@ public class CertificateImporter
                 }
             }
         }
-        catch ( Exception e )
+        catch ( CertificateEncodingException e )
         {
-            IllegalStateException error =
-                new IllegalStateException( "Failed to scan keystore for existing certificates" );
-            error.initCause( e );
-
-            throw error;
+            throw new SSLToolsException( "Failed to scan keystore for existing certificates. Error: %s", e,
+                                         e.getMessage() );
+        }
+        catch ( KeyStoreException e )
+        {
+            throw new SSLToolsException( "Failed to scan keystore for existing certificates. Error: %s", e,
+                                         e.getMessage() );
         }
 
         LOGGER.debug( "Server sent %d certificate(s):", chain.length );
@@ -250,10 +270,8 @@ public class CertificateImporter
             }
             catch ( KeyStoreException e )
             {
-                IllegalStateException error = new IllegalStateException( "Failed to add certificate to keystore" );
-                error.initCause( e );
-
-                throw error;
+                throw new SSLToolsException( "Failed to add certificate to keystore: %s. Error: %s", e, alias,
+                                             e.getMessage() );
             }
 
             LOGGER.info( "Added certificate to keystore using alias: '%s'", alias );
@@ -261,7 +279,7 @@ public class CertificateImporter
 
         return this;
     }
-    
+
     public boolean isChanged()
     {
         return changed;
@@ -296,7 +314,7 @@ public class CertificateImporter
         {
             ks = KeyStoreManager.load( keystoreFile, storepass );
         }
-        
+
         return new CertificateImporter( ks );
     }
 

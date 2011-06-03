@@ -1,0 +1,89 @@
+  ---
+  Usage
+  ---
+  John Casey
+  ---
+  June 3 2011
+  ---
+
+
+Usage
+
+* Introduction
+
+  The SSL Tools Plugin has two essential functions: importing server SSL certificates (especially self-signed SSL certificates), and importing client SSL certificates (for mutual SSL authentication).
+  
+* Configuring for Direct Goal Usage
+
+  To use the SSL Tools Plugin directly from the command line, you should consider adding the groupId to the pluginGroups section in your <<<settings.xml>>> file:
+  
++---+
+  <settings>
+  [...]
+    <pluginGroups>
+      <pluginGroup>org.commonjava.ssl</pluginGroup>
+    </pluginGroups>
+  [...]
+  </settings>
++---+
+  
+* Importing SSL Certificates Used in Your Build
+
+  The simplest usage example for this plugin is the case of a repository that uses a self-signed SSL certificate. Since the project will be configured to access this repository, we can simply point the <<<ssl-tools:import-server-cert>>> goal at the project itself:
+  
++---+
+  $ mvn ssl-tools:import-server-cert
+  [...]
+  
+  [INFO] ------------------------------------------------------------------------
+  [INFO] Building SSL Tools :: Parent POM 1.0-SNAPSHOT
+  [INFO] ------------------------------------------------------------------------
+  [INFO] 
+  [INFO] --- ssl-tools-maven-plugin:1.0:import-server-cert (default-cli) @ my-project ---
+  [INFO] Skipping: 'http://repo1.maven.org/maven2'
+  [INFO] Importing: 'https://repo.myco.com/staging-repository/'
+  [INFO] ------------------------------------------------------------------------
+  [INFO] BUILD SUCCESS
+  [INFO] ------------------------------------------------------------------------
+  
+  [...]
++---+
+  
+* Importing SSL Certificates for Specific Hosts
+
+  If I wanted to tell the goal to skip scanning the project, and instead use a set of hosts that I specify, I could run the <<<ssl-tools:import-server-cert>>> goal this way:
+  
++---+
+  $ mvn -Dimport.servers=repo1.maven.org,repo.myco.com ssl-tools:import-server-cert
+  [...]
+  
+  [INFO] Importing: 'repo1.maven.org:443'
+  [INFO] Importing: 'repo.myco.com:443'
+  [INFO] 1 errors encountered while importing certificates:
+    repo1.maven.org: Failed to initialize SSL socket: Connection refused
+
+  Please re-run with -e to print stack traces.
+
+  [INFO] ------------------------------------------------------------------------
+  [INFO] BUILD SUCCESS
+  [INFO] ------------------------------------------------------------------------
+    
+  [...]
++---+
+
+  Note that, since repo1.maven.org doesn't use an SSL URL, it didn't make sense for me to try to import the SSL certificate for that site. Not to worry, the plugin simply moved on to the other site that I specified, and attempted to import that. After all attempts were complete, it reported the connection error for repo1.maven.org.
+  
+  Also notice that, since I didn't specify ports for the servers in my command line, the plugin assumed I meant port 443, the standard SSL port. If <<<repo.myco.com>>> were running on, say, port <<<8443>>>, I could have specified the command line like this:
+  
++---+
+  $ mvn -Dimport.servers=repo.myco.com:8443 ssl-tools:import-server-cert
++---+
+
+
+* Import an SSL Client Certificate
+
+  Usually, when dealing with a client SSL certificate, you're actually dealing with a password-protected file in a format called {{{http://www.rsa.com/rsalabs/node.asp?id=2138}PKCS#12}}. To import the certificates from one of these files into the native Java KeyStore (JKS) format, you can simply run:
+  
++---+
+  $ mvn ssl-tools:import-client-cert -Dimport.certificate=/path/to/cert.p12 -Dcertpass=MyPassword
++---+

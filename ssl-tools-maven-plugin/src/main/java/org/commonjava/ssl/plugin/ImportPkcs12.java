@@ -51,7 +51,7 @@ public class ImportPkcs12
      */
     private String certpass;
 
-    public void execute()
+    protected void doExecute()
         throws MojoExecutionException, MojoFailureException
     {
         try

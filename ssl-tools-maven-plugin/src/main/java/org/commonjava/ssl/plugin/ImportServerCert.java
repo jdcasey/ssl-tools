@@ -97,7 +97,7 @@ public class ImportServerCert
     
     private CertificateImporter importer;
 
-    public void execute()
+    protected void doExecute()
         throws MojoExecutionException, MojoFailureException
     {
         if ( sourceKeystore == null )
@@ -246,7 +246,7 @@ public class ImportServerCert
             int port = url.getPort();
             if ( port < 1 )
             {
-                port = 80;
+                port = 443;
             }
             
             importer.importServerCertificates( url.getHost(), port, sourceKeystore, sourceStorepass.toCharArray(), keystore,
@@ -274,7 +274,7 @@ public class ImportServerCert
             seen.add( server );
             
             String host = server;
-            int port = -1;
+            int port = 443;
             
             int idx = server.indexOf( ":" );
             if ( idx > 0 )
@@ -283,6 +283,7 @@ public class ImportServerCert
                 port = Integer.parseInt( server.substring( idx+1 ) );
             }
             
+            getLog().info( "Importing: '" + host + ":" + port + "'" );
             try
             {
                 importer.importServerCertificates( host, port, sourceKeystore, sourceStorepass.toCharArray(), keystore,
