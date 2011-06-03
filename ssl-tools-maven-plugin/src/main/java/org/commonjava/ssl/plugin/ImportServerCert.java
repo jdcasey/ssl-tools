@@ -18,13 +18,22 @@
 package org.commonjava.ssl.plugin;
 
 import org.apache.maven.execution.MavenSession;
+import org.apache.maven.model.DeploymentRepository;
+import org.apache.maven.model.DistributionManagement;
+import org.apache.maven.model.Repository;
+import org.apache.maven.model.Site;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
 import org.commonjava.ssl.SSLToolsException;
 import org.commonjava.ssl.in.CertificateImporter;
+import org.sonatype.aether.RepositorySystemSession;
+import org.sonatype.aether.repository.MirrorSelector;
+import org.sonatype.aether.repository.RemoteRepository;
 
 import java.io.File;
+import java.net.MalformedURLException;
+import java.net.URL;
 import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -119,8 +128,7 @@ public class ImportServerCert
         
         if (importServers == null && servers == null )
         {
-            // TODO: Get the repositories, pluginRepositories, and distributionManagement repos, and use those...
-//            session.get
+            importProjectCerts( errors );
         }
 
         if ( importer != null && importer.isChanged() )
@@ -133,6 +141,100 @@ public class ImportServerCert
             {
                 throw new MojoExecutionException( "Cannot save keystore containing imported certificates: " + e.getMessage(), e );
             }
+        }
+        
+        if ( !errors.isEmpty() )
+        {
+            if ( stopOnFailure )
+            {
+                throw new SSLToolsMojoException( errors );
+            }
+            else
+            {
+                getLog().info( SSLToolsMojoException.formatSummary( errors ) );
+            }
+        }
+    }
+
+    private void importProjectCerts( Map<String, SSLToolsException> errors )
+    {
+        RepositorySystemSession rss = session.getRepositorySession();
+        MirrorSelector mirrorSelector = rss.getMirrorSelector();
+        
+        List<Repository> repos = project.getRepositories();
+        importRepos( repos, mirrorSelector, errors );
+        
+        repos = project.getPluginRepositories();
+        importRepos( repos, mirrorSelector, errors );
+        
+        DistributionManagement dm = project.getDistributionManagement();
+        if ( dm != null )
+        {
+            DeploymentRepository[] drepos = {
+                dm.getRepository(),
+                dm.getSnapshotRepository(),
+            };
+            
+            for ( DeploymentRepository drepo : drepos )
+            {
+                if ( drepo != null )
+                {
+                    importCerts( drepo.getUrl(), errors );
+                }
+            }
+            
+            Site site = dm.getSite();
+            if ( site != null )
+            {
+                importCerts( site.getUrl(), errors );
+            }
+        }
+    }
+
+    private void importRepos( List<Repository> repos, MirrorSelector mirrorSelector,
+                              Map<String, SSLToolsException> errors )
+    {
+        if ( repos != null )
+        {
+            for ( Repository repo : repos )
+            {
+                String url = repo.getUrl();
+                if ( mirrorSelector != null )
+                {
+                    RemoteRepository mirror = mirrorSelector.getMirror( new RemoteRepository( repo.getId(), repo.getLayout(), url ) );
+                    if ( mirror != null )
+                    {
+                        url = mirror.getUrl();
+                    }
+                }
+                
+                importCerts( url, errors );
+            }
+        }
+    }
+
+    private void importCerts( String serverUrl, Map<String, SSLToolsException> errors )
+    {
+        try
+        {
+            URL url = new URL( serverUrl );
+            
+            int port = url.getPort();
+            if ( port < 1 )
+            {
+                port = 80;
+            }
+            
+            importer.importServerCertificates( url.getHost(), port, sourceKeystore, sourceStorepass.toCharArray(), keystore,
+                                               storepass.toCharArray() );
+        }
+        catch ( SSLToolsException e )
+        {
+            errors.put( serverUrl, e );
+        }
+        catch ( MalformedURLException e )
+        {
+            errors.put( serverUrl, new SSLToolsException( "Invalid URL: '%s'", e, serverUrl ) );
         }
     }
 

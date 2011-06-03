@@ -41,6 +41,14 @@ abstract class AbstractKeystoreMojo
      * @parameter expression="${import.storepass}" default="changeit"
      */
     protected String storepass;
+    
+    /**
+     * If <code>true</code>, throw an exception to stop the build if there are import failures.
+     * (Otherwise, simply report the failures and continue.)
+     * 
+     * @parameter expression="${import.stop-on-failure}" default="false"
+     */
+    protected boolean stopOnFailure;
 
     @Override
     public Log getLog()
