@@ -265,7 +265,7 @@
   <distributionManagement>
     <site>
       <id>local-website</id>
-      <url>file://${project.build.directory}/site-deploy</url>
+      <url>file://${user.dir}/target/site-deploy</url>
     </site>
   </distributionManagement>
 </project>
