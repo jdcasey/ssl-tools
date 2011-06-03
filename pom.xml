@@ -28,7 +28,7 @@
   
   <groupId>org.commonjava.ssl</groupId>
   <artifactId>ssl-tools-parent</artifactId>
-  <version>0.1-SNAPSHOT</version>
+  <version>1.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>SSL Tools :: Parent POM</name>
