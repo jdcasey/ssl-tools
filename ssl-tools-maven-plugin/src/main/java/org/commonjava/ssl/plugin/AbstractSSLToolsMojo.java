@@ -32,7 +32,6 @@ import org.apache.maven.plugin.logging.Log;
 
 import java.io.File;
 import java.net.URL;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.Map;
 
